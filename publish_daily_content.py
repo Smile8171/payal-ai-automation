@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from app.media_generator import create_slideshow_video, generate_daily_photos
+from app.media_generator import generate_ai_video, generate_daily_photos
 
 
 ROOT = Path(__file__).resolve().parent
@@ -203,11 +203,12 @@ def run() -> None:
 
     theme = engagement_theme(page_id, token)
     creative_brief = generate_text(
-        "Create a fresh, family-friendly lifestyle photo and short slideshow theme inspired by "
-        f"this high-performing post, without copying it: {theme!r}. Return one concise visual theme."
+        "Create a fresh, family-friendly lifestyle theme for original AI-generated photos and video. "
+        f"Use this high-performing post only as inspiration, without copying it: {theme!r}. "
+        "Return one concise visual theme."
     )[:300]
     photos = generate_daily_photos(creative_brief)
-    video = create_slideshow_video(photos, ROOT / "data" / "generated_media" / "daily_video.mp4")
+    video = generate_ai_video(creative_brief, ROOT / "data" / "generated_media" / "daily_video.mp4")
 
     now = datetime.now(LOCAL_ZONE)
     publish_slots = [(name, datetime.combine(today, slot_time, LOCAL_ZONE)) for name, slot_time in POST_SLOTS]
