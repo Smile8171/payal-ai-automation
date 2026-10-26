@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent
 STATE_PATH = ROOT / "data" / "publishing_state.json"
 GRAPH_VERSION = os.getenv("FB_GRAPH_API_VERSION", "v26.0")
 LOCAL_ZONE = ZoneInfo(os.getenv("TIMEZONE", "Asia/Kolkata"))
-POST_SLOTS = (("photo_morning", time(7, 0)), ("photo_afternoon", time(13, 10)))
+POST_SLOTS = (("photo_morning", time(7, 0)), ("photo_evening", time(19, 0)))
 GRAPH_ROOT = f"https://graph.facebook.com/{GRAPH_VERSION}"
 
 

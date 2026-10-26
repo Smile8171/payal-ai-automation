@@ -20,7 +20,7 @@ python publish_daily_content.py
 python reply_to_comments.py
 ```
 
-The posting job schedules images for 07:00 and 13:10 in `Asia/Kolkata`. GitHub Actions runs it daily at 05:45 India time and checks comments every 30 minutes. Dispatching the daily workflow manually also schedules posts; it does not publish them immediately.
+The posting job schedules images for 07:00 and 19:00 in `Asia/Kolkata`. GitHub Actions runs it daily at 05:45 India time and checks comments every 30 minutes. Dispatching the daily workflow manually also schedules posts; it does not publish them immediately.
 
 ## GitHub Actions Secrets
 
