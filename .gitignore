@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+.idea/
+.DS_Store
+*.log
+data/generated_media/*
+data/reference_images/*
+!data/reference_images/.gitkeep
+!data/generated_media/.gitkeep
