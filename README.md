@@ -1,35 +1,40 @@
 # Payal AI Automation
 
-Starter project for automating content on an authorized Facebook Page.
+Schedules two AI-generated images and one short slideshow video daily for an authorized Facebook Page. A separate job checks recent Page comments every 30 minutes and replies once per comment. The daily job uses recent post engagement to guide creative themes and records scheduled slots to avoid duplicate runs.
 
-## Intended workflow
+## Setup
 
-- Generate two original images and one short video each day.
-- Publish through the Meta Graph API.
-- Track published content to reduce duplicates.
-- Use engagement data to inform future content.
-- Reply to Page comments with short, friendly AI-generated responses.
-
-## Current status
-
-This repository is an initial scaffold, not a production-ready publisher. The current image pipeline creates placeholder variations, and the runner prints a plan rather than publishing it. Do not add production credentials or rely on the scheduled workflow until generation, posting, comment handling, and tests are completed.
-
-## Local setup
+Install Python 3.12 and FFmpeg, then install dependencies:
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
-python run.py
 ```
 
-Use `.env.example` for variable names only. Keep real keys and Page tokens in local environment variables or GitHub Actions secrets, never in committed files.
+Set the environment variables from `.env.example`, then run either job:
 
-## Required Meta permissions
+```powershell
+python publish_daily_content.py
+python reply_to_comments.py
+```
 
-The Page access token must be authorized for the Graph API operations the app uses, such as publishing Page content and reading/replying to comments. Meta app review and Page permissions may be required.
+The daily workflow schedules images for 07:00 and 13:10 and the video for 17:00 in `Asia/Kolkata`. GitHub Actions runs daily at 05:45 India time. Dispatching the daily workflow manually also schedules posts; it does not publish them immediately.
 
-## Configuration
+## GitHub Actions secrets
 
-See `.env.example`. Configure only credentials for services you actually enable. Never commit `.env`, access tokens, app secrets, or generated private media.
+Add these under **Settings > Secrets and variables > Actions**:
+
+- `FB_PAGE_ID`
+- `FB_PAGE_ACCESS_TOKEN`
+- `POLLINATIONS_API_KEY`
+- At least one text provider key: `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, or `OPENAI_API_KEY`
+
+Allow Actions to write repository contents so the jobs can persist duplicate-prevention state. The Page token needs Meta permissions for publishing Page content, reading engagement, and replying to comments. Meta app review may be required.
+
+Comment text is sent to the configured text provider to draft a reply. A fallback reply is used if all text providers fail.
+
+## Safety
+
+Use only a Page you administer and content you are authorized to publish. Test with a non-production Page before enabling real credentials. Never commit `.env`, API keys, Page tokens, app secrets, or private media.
