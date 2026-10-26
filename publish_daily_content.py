@@ -9,14 +9,14 @@ from zoneinfo import ZoneInfo
 
 import requests
 
-from app.media_generator import generate_ai_video, generate_daily_photos
+from app.media_generator import generate_daily_photos
 
 
 ROOT = Path(__file__).resolve().parent
 STATE_PATH = ROOT / "data" / "publishing_state.json"
 GRAPH_VERSION = os.getenv("FB_GRAPH_API_VERSION", "v26.0")
 LOCAL_ZONE = ZoneInfo(os.getenv("TIMEZONE", "Asia/Kolkata"))
-POST_SLOTS = (("photo_morning", time(7, 0)), ("photo_afternoon", time(13, 10)), ("video_evening", time(17, 0)))
+POST_SLOTS = (("photo_morning", time(7, 0)), ("photo_afternoon", time(13, 10)))
 GRAPH_ROOT = f"https://graph.facebook.com/{GRAPH_VERSION}"
 
 
@@ -156,25 +156,6 @@ def schedule_photo(page_id: str, token: str, photo: Path, caption: str, publish_
     return post_id
 
 
-def schedule_video(page_id: str, token: str, video: Path, caption: str, publish_at: datetime) -> str:
-    with video.open("rb") as video_file:
-        result = _request(
-            "POST",
-            f"{page_id}/videos",
-            data={
-                "access_token": token,
-                "description": caption,
-                "published": "false",
-                "scheduled_publish_time": str(int(publish_at.timestamp())),
-            },
-            files={"source": (video.name, video_file, "video/mp4")},
-        )
-    post_id = result.get("id")
-    if not isinstance(post_id, str):
-        raise RuntimeError("Meta did not return a scheduled video ID.")
-    return post_id
-
-
 def caption_for(theme: str, slot: str) -> str:
     prompt = (
         "Write one short, warm, family-friendly Facebook Page caption in natural English. "
@@ -203,12 +184,11 @@ def run() -> None:
 
     theme = engagement_theme(page_id, token)
     creative_brief = generate_text(
-        "Create a fresh, family-friendly lifestyle theme for original AI-generated photos and video. "
+        "Create a fresh, family-friendly lifestyle theme for original AI-generated photos. "
         f"Use this high-performing post only as inspiration, without copying it: {theme!r}. "
         "Return one concise visual theme."
     )[:300]
     photos = generate_daily_photos(creative_brief)
-    video = generate_ai_video(creative_brief, ROOT / "data" / "generated_media" / "daily_video.mp4")
 
     now = datetime.now(LOCAL_ZONE)
     publish_slots = [(name, datetime.combine(today, slot_time, LOCAL_ZONE)) for name, slot_time in POST_SLOTS]
@@ -221,10 +201,7 @@ def run() -> None:
         if name in results:
             continue
         caption = caption_for(creative_brief, name)
-        if name == "video_evening":
-            post_id = schedule_video(page_id, token, video, caption, publish_at)
-        else:
-            post_id = schedule_photo(page_id, token, photos[index], caption, publish_at)
+        post_id = schedule_photo(page_id, token, photos[index], caption, publish_at)
         results[name] = {"post_id": post_id, "publish_at": publish_at.isoformat()}
         scheduled[day_key] = results
         save_state(state)
