@@ -42,7 +42,7 @@ def _request(method: str, path: str, **kwargs: object) -> dict[str, object]:
     response.raise_for_status()
     payload = response.json()
     if not isinstance(payload, dict) or "error" in payload:
-        raise RuntimeError(f"Meta Graph API returned an error: {payload}")
+        raise RuntimeError("Meta Graph API returned an error response.")
     return payload
 
 
@@ -230,5 +230,7 @@ if __name__ == "__main__":
     try:
         run()
     except (OSError, ValueError, RuntimeError, requests.RequestException) as error:
-        print(f"Automation failed: {error}", file=sys.stderr)
-        raise SystemExit(1) from error
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        detail = f" (HTTP {status})" if status else ""
+        print(f"Automation failed: {error.__class__.__name__}{detail}", file=sys.stderr)
+        raise SystemExit(1) from None

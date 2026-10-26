@@ -133,5 +133,7 @@ if __name__ == "__main__":
     try:
         run()
     except (OSError, ValueError, RuntimeError, requests.RequestException) as error:
-        print(f"Comment reply job failed: {error}", file=sys.stderr)
-        raise SystemExit(1) from error
+        status = getattr(getattr(error, "response", None), "status_code", None)
+        detail = f" (HTTP {status})" if status else ""
+        print(f"Comment reply job failed: {error.__class__.__name__}{detail}", file=sys.stderr)
+        raise SystemExit(1) from None
