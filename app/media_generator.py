@@ -11,7 +11,10 @@ from PIL import Image, ImageOps
 
 OUTPUT_DIR = Path("data/generated_media")
 IMAGE_URL = "https://gen.pollinations.ai/image/"
+VIDEO_URL = "https://gen.pollinations.ai/video/"
 IMAGE_MODEL = "black-forest-labs/flux.1-schnell"
+VIDEO_MODEL = os.getenv("POLLINATIONS_VIDEO_MODEL", "google/gemini-omni-1.1-flash")
+VIDEO_DURATION = int(os.getenv("POLLINATIONS_VIDEO_DURATION", "5"))
 IMAGE_SIZE = (1024, 1280)
 
 
@@ -61,33 +64,36 @@ def generate_daily_photos(theme: str) -> list[Path]:
     ]
 
 
-def create_slideshow_video(image_paths: list[Path], output_path: Path) -> Path:
-    if not image_paths:
-        raise ValueError("At least one generated image is required for the video.")
+def generate_ai_video(theme: str, output_path: Path) -> Path:
+    if not 3 <= VIDEO_DURATION <= 10:
+        raise ValueError("POLLINATIONS_VIDEO_DURATION must be between 3 and 10 seconds.")
 
-    from moviepy.editor import ImageClip, concatenate_videoclips
-
-    clips = [
-        ImageClip(str(path))
-        .resize(height=1350)
-        .crop(x_center=540, y_center=675, width=1080, height=1350)
-        .set_duration(7.5)
-        .fadein(0.4)
-        .fadeout(0.4)
-        for path in image_paths
-    ]
-    video = concatenate_videoclips(clips, method="compose")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    video.write_videofile(
-        str(output_path),
-        fps=24,
-        codec="libx264",
-        audio=False,
-        preset="medium",
-        threads=2,
-        logger=None,
+    prompt = (
+        "Create an original, polished, photorealistic short video for a family-friendly Facebook Page. "
+        "Portrait 9:16 composition, a single continuous cinematic shot, gentle natural camera motion. "
+        "Feature one fictional adult woman age 25 or older in tasteful contemporary clothing, with a "
+        "warm confident expression and natural movement. Visual theme: "
+        f"{theme}. Use realistic lighting and a clean lifestyle-editorial look. "
+        "No text, captions, logos, watermarks, extra people, or dialogue."
     )
-    video.close()
-    for clip in clips:
-        clip.close()
+    response = requests.get(
+        VIDEO_URL + requests.utils.quote(prompt, safe=""),
+        params={
+            "model": VIDEO_MODEL,
+            "duration": VIDEO_DURATION,
+            "resolution": "720p",
+            "aspect_ratio": "9:16",
+        },
+        headers={"Authorization": f"Bearer {_pollinations_key()}"},
+        timeout=300,
+    )
+    response.raise_for_status()
+    content = response.content
+    if len(content) < 12 or content[4:8] != b"ftyp":
+        raise RuntimeError("Pollinations did not return a valid MP4 video.")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = output_path.with_suffix(output_path.suffix + ".tmp")
+    temporary_path.write_bytes(content)
+    temporary_path.replace(output_path)
     return output_path
