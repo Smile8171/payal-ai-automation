@@ -40,8 +40,6 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
-          POLLINATIONS_VIDEO_MODEL: google/gemini-omni-1.1-flash
-          POLLINATIONS_VIDEO_DURATION: "5"
         run: python publish_daily_content.py
 
       - name: Persist duplicate-prevention state
