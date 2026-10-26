@@ -89,8 +89,12 @@ def engagement_theme(page_id: str, token: str) -> str:
 
 def generate_text(prompt: str) -> str:
     errors: list[str] = []
-    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-    if gemini_key:
+    gemini_keys = [
+        os.getenv(name, "").strip()
+        for name in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3")
+        if os.getenv(name, "").strip()
+    ]
+    for index, gemini_key in enumerate(gemini_keys, start=1):
         try:
             response = requests.post(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
@@ -101,7 +105,7 @@ def generate_text(prompt: str) -> str:
             response.raise_for_status()
             return response.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         except (requests.RequestException, KeyError, IndexError, TypeError, ValueError) as error:
-            errors.append(f"Gemini: {error.__class__.__name__}")
+            errors.append(f"Gemini key {index}: {error.__class__.__name__}")
 
     for env_name, endpoint, model in (
         ("OPENROUTER_API_KEY", "https://openrouter.ai/api/v1/chat/completions", "openai/gpt-4o-mini"),
