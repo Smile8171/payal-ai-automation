@@ -28,6 +28,9 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Validate experiment plan without API calls
+        run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
+
       - name: Generate and schedule two photos and one video
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
@@ -43,7 +46,7 @@ jobs:
           POLLINATIONS_IMAGE_MODEL: ${{ vars.POLLINATIONS_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b' }}
           POLLINATIONS_VIDEO_MODEL: ${{ vars.POLLINATIONS_VIDEO_MODEL || 'google/veo-3.1-fast' }}
           VIDEO_DURATION_SECONDS: "4"
-        run: python publish_experiment_content.py
+        run: python publish_experiment_content.py/publish_experiment_content.py
 
       - name: Persist duplicate-prevention state
         if: always()
