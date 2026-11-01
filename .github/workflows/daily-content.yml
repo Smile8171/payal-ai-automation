@@ -59,7 +59,9 @@ jobs:
           from datetime import datetime, timedelta
 
           publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
-          api_key = os.environ["POLLINATIONS_API_KEY"]
+          api_key = os.environ["POLLINATIONS_API_KEY"].strip()
+          page_id = os.environ["FB_PAGE_ID"].strip()
+          page_token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
           scene_name, scene_description = publisher["PHOTO_SCENES"][0]
           prompt = (
               "Photorealistic, family-friendly lifestyle editorial portrait of a fictional adult Indian woman age 25 or older, "
@@ -73,8 +75,8 @@ jobs:
           caption = f"A little moment from {scene_name}. Wishing everyone a lovely day."
           publish_at = datetime.now(publisher["TIMEZONE"]) + timedelta(minutes=30)
           post_id = publisher["schedule_photo"](
-              os.environ["FB_PAGE_ID"],
-              os.environ["FB_PAGE_ACCESS_TOKEN"],
+              page_id,
+              page_token,
               image,
               caption,
               publish_at,
