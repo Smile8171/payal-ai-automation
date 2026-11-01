@@ -37,7 +37,7 @@ jobs:
       - name: Validate experiment plan without API calls
         run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
 
-      - name: Generate and schedule two photos and one video
+      - name: Generate and schedule three posts (midday video optional)
         if: github.event_name == 'schedule' || inputs.dry_run_only != true
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
