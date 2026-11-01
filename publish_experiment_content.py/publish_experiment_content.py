@@ -188,17 +188,17 @@ def generate_media(kind: str, prompt: str, model: str, api_key: str, reference: 
 
 
 def schedule_photo(page_id: str, token: str, image: bytes, caption: str, publish_at: datetime) -> str:
-    upload = request_graph(
-        "POST", f"{page_id}/photos", data={"access_token": token, "published": "false", "temporary": "true"},
+    post = request_graph(
+        "POST", f"{page_id}/photos",
+        data={
+            "access_token": token,
+            "message": caption,
+            "published": "false",
+            "scheduled_publish_time": str(int(publish_at.timestamp())),
+        },
         files={"source": ("lifestyle.jpg", io.BytesIO(image), "image/jpeg")},
     )
-    photo_id = upload.get("id")
-    if not isinstance(photo_id, str):
-        raise RuntimeError("Meta did not return a photo ID.")
-    post = request_graph(
-        "POST", f"{page_id}/feed", data={"access_token": token, "message": caption, "attached_media[0]": json.dumps({"media_fbid": photo_id}), "published": "false", "scheduled_publish_time": str(int(publish_at.timestamp()))},
-    )
-    post_id = post.get("id")
+    post_id = post.get("post_id") or post.get("id")
     if not isinstance(post_id, str):
         raise RuntimeError("Meta did not return a scheduled photo post ID.")
     return post_id
