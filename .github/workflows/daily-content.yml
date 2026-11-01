@@ -159,8 +159,8 @@ jobs:
           publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
           page_id = os.environ["FB_PAGE_ID"].strip()
           token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
-          photo_id = "1544799337678466"
-          expected = "A little moment from a village courtyard at sunrise. Wishing everyone a lovely day."
+          photo_id = "1544824481009285"
+          expected = "A peaceful sunrise in a village courtyard. Wishing everyone a lovely day."
 
           def read(label, path, fields):
               try:
@@ -199,8 +199,12 @@ jobs:
               detail = read("post_detail", post_id, "id,message,created_time,permalink_url,is_published,privacy,status_type,attachments")
               if detail is None:
                   detail = read("post_detail_minimal", post_id, "id,message,created_time")
+              visibility = read("post_visibility", post_id, "id,is_hidden,from")
               if detail is not None:
-                  print(f"POST_METADATA id={detail.get('id')}, created_time={detail.get('created_time')}, is_published={detail.get('is_published')}, privacy={detail.get('privacy')}, status_type={detail.get('status_type')}, permalink={detail.get('permalink_url')}, attachments={detail.get('attachments')}")
+                  owner = (visibility or {}).get("from")
+                  owner_id = owner.get("id") if isinstance(owner, dict) else None
+                  owner_name = owner.get("name") if isinstance(owner, dict) else None
+                  print("POST_METADATA", "id=", detail.get("id"), "created_time=", detail.get("created_time"), "is_published=", detail.get("is_published"), "is_hidden=", (visibility or {}).get("is_hidden"), "privacy=", detail.get("privacy"), "status_type=", detail.get("status_type"), "owner_matches_configured=", owner_id == page_id, "owner_name=", owner_name, "permalink=", detail.get("permalink_url"))
           PY
 
       - name: Generate and schedule three posts (midday video optional)
