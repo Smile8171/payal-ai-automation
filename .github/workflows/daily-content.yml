@@ -8,6 +8,11 @@ on:
         required: false
         type: boolean
         default: true
+      test_photo_only:
+        description: "Generate and schedule one test photo about 30 minutes from now"
+        required: false
+        type: boolean
+        default: false
   schedule:
     - cron: "15 0 * * *"
 
@@ -37,8 +42,48 @@ jobs:
       - name: Validate experiment plan without API calls
         run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
 
+      - name: Generate and schedule one test photo
+        if: github.event_name == 'workflow_dispatch' && inputs.test_photo_only == true
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          FB_GRAPH_API_VERSION: v26.0
+          TIMEZONE: Asia/Kolkata
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          POLLINATIONS_IMAGE_MODEL: ${{ vars.POLLINATIONS_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b' }}
+        run: |
+          python - <<'PY'
+          import os
+          import random
+          import runpy
+          from datetime import datetime, timedelta
+
+          publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
+          api_key = os.environ["POLLINATIONS_API_KEY"]
+          scene_name, scene_description = publisher["PHOTO_SCENES"][0]
+          prompt = (
+              "Photorealistic, family-friendly lifestyle editorial portrait of a fictional adult Indian woman age 25 or older, "
+              f"{scene_description}, natural confident pose, fully clothed in tasteful contemporary Indian clothing, realistic skin texture, "
+              "respectful and non-sexualized, no minors, no suggestive posing, no text, no watermark, no logo. Portrait 4:5 framing. "
+              "If a reference image is provided, use only its broad visual style and composition; do not copy the person's identity or face."
+          )
+          references = publisher["upload_references"](api_key)
+          reference = random.choice(references) if references else None
+          image = publisher["generate_media"]("photo", prompt, publisher["IMAGE_MODEL"], api_key, reference)
+          caption = f"A little moment from {scene_name}. Wishing everyone a lovely day."
+          publish_at = datetime.now(publisher["TIMEZONE"]) + timedelta(minutes=30)
+          post_id = publisher["schedule_photo"](
+              os.environ["FB_PAGE_ID"],
+              os.environ["FB_PAGE_ACCESS_TOKEN"],
+              image,
+              caption,
+              publish_at,
+          )
+          print(f"Scheduled one test photo as {post_id} for {publish_at.isoformat()}.")
+          PY
+
       - name: Generate and schedule three posts (midday video optional)
-        if: github.event_name == 'schedule' || inputs.dry_run_only != true
+        if: github.event_name == 'schedule' || (inputs.test_photo_only != true && inputs.dry_run_only != true)
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
