@@ -9,7 +9,7 @@ on:
         type: boolean
         default: true
       test_photo_only:
-        description: "Attach the existing public test photo to one Page feed post"
+        description: "Generate one fresh unpublished photo, then attach it to one Page feed post"
         required: false
         type: boolean
         default: false
@@ -47,35 +47,101 @@ jobs:
       - name: Validate experiment plan without API calls
         run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
 
-      - name: Attach the existing public photo to one Page feed post
+      - name: Publish one fresh photo test to the Page feed
         if: github.event_name == 'workflow_dispatch' && inputs.test_photo_only == true
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
           FB_GRAPH_API_VERSION: v26.0
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          POLLINATIONS_IMAGE_MODEL: ${{ vars.POLLINATIONS_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b' }}
         run: |
           python - <<'PY'
+          import io
           import json
           import os
           import runpy
+          import requests
 
           publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
           page_id = os.environ["FB_PAGE_ID"].strip()
           page_token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
-          result = publisher["request_graph"](
-              "POST",
-              f"{page_id}/feed",
+          api_key = os.environ["POLLINATIONS_API_KEY"].strip()
+          caption = "A peaceful sunrise in a village courtyard. Wishing everyone a lovely day."
+
+          def graph(label, method, path, **kwargs):
+              try:
+                  return publisher["request_graph"](method, path, **kwargs)
+              except requests.HTTPError as error:
+                  details = {}
+                  try:
+                      if error.response is not None:
+                          details = error.response.json().get("error", {})
+                  except (AttributeError, ValueError):
+                      pass
+                  status = error.response.status_code if error.response is not None else "unknown"
+                  print("META_ERROR", label, "http=", status, "code=", details.get("code"), "subcode=", details.get("error_subcode"), "message=", details.get("message", "unavailable"))
+                  raise RuntimeError("Meta Graph API failed during " + label + " (HTTP " + str(status) + ").") from None
+
+          page = graph("target page lookup", "GET", page_id, params={"access_token": page_token, "fields": "id,name"})
+          if page.get("id") != page_id:
+              raise RuntimeError("Meta returned a different Page ID than the configured target.")
+          print("TARGET_PAGE", "id_matches_configured=", True, "name=", page.get("name"))
+
+          prompt = (
+              "Photorealistic documentary-style portrait of a fictional clearly adult 20-year-old Indian woman "
+              "in a quiet rural Indian village courtyard at sunrise, wearing simple tasteful everyday salwar kameez. "
+              "Mud-plastered village home, plants, soft natural morning light, realistic youthful adult features and skin texture, "
+              "calm natural expression, authentic rural background, family-friendly and non-sexualized. "
+              "No minors, elderly or middle-aged appearance, studio glamour, city scenery, text, watermark, or logo. Portrait 4:5 framing."
+          )
+          image = publisher["generate_media"](
+              "photo", prompt, os.getenv("POLLINATIONS_IMAGE_MODEL", publisher["IMAGE_MODEL"]), api_key
+          )
+          if not image:
+              raise RuntimeError("Image generation returned empty media.")
+
+          upload = graph(
+              "unpublished photo upload", "POST", f"{page_id}/photos",
+              data={"access_token": page_token, "published": "false"},
+              files={"source": ("feed-test.jpg", io.BytesIO(image), "image/jpeg")},
+          )
+          photo_id = upload.get("id")
+          if not isinstance(photo_id, str):
+              raise RuntimeError("Meta did not return an ID for the unpublished test photo.")
+          print("FRESH_UNPUBLISHED_PHOTO", "id=", photo_id)
+
+          post = graph(
+              "Page feed post", "POST", f"{page_id}/feed",
               data={
                   "access_token": page_token,
-                  "message": "A little moment from a village courtyard at sunrise. Wishing everyone a lovely day.",
-                  "attached_media[0]": json.dumps({"media_fbid": "1544799337678466"}),
+                  "message": caption,
+                  "attached_media[0]": json.dumps({"media_fbid": photo_id}),
                   "published": "true",
               },
           )
-          post_id = result.get("id")
+          post_id = post.get("id")
           if not isinstance(post_id, str):
               raise RuntimeError("Meta did not return a Page feed post ID.")
-          print(f"Published one Page feed test using existing photo: {post_id}.")
+
+          detail = graph(
+              "feed post verification", "GET", post_id,
+              params={"access_token": page_token, "fields": "id,message,is_published,privacy,status_type,permalink_url,attachments"},
+          )
+          privacy = detail.get("privacy")
+          privacy_value = privacy.get("value") if isinstance(privacy, dict) else None
+          attachments = detail.get("attachments")
+          attachment_nodes = attachments.get("data", []) if isinstance(attachments, dict) else []
+          photo_attached = isinstance(attachment_nodes, list) and any(
+              isinstance(item, dict)
+              and item.get("type") == "photo"
+              and isinstance(item.get("target"), dict)
+              and item["target"].get("id") == photo_id
+              for item in attachment_nodes
+          )
+          if detail.get("is_published") is not True or privacy_value != "EVERYONE" or not photo_attached:
+              raise RuntimeError("Feed post exists, but published/public photo attachment verification did not pass.")
+          print("FEED_TEST_VERIFIED", "post_id=", post_id, "privacy=", privacy_value, "status_type=", detail.get("status_type"), "photo_attached=", photo_attached, "permalink=", detail.get("permalink_url"))
           PY
 
       - name: Diagnose Page photo and feed metadata (read-only)
