@@ -13,9 +13,9 @@ from zoneinfo import ZoneInfo
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()
-
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(ROOT / "secrets" / ".env")
+load_dotenv(ROOT / ".env")
 STATE_PATH = ROOT / "data" / "publishing_state.json"
 REFERENCE_DIR = ROOT / "data" / "reference_images"
 GRAPH_VERSION = os.getenv("FB_GRAPH_API_VERSION", "v26.0")
@@ -30,6 +30,11 @@ POST_SLOTS = (("photo_morning", time(7)), ("experiment_video", time(13)), ("phot
 OBJECTS = ("a smartphone", "a steel ball", "a glass sphere", "a synthetic diamond replica", "a citrus fruit", "a ceramic mug", "a rubber ball", "ice cubes", "a toy block", "a small watermelon")
 STYLES = ("macro material study", "bright industrial documentary", "high-speed-camera look", "symmetrical product-test composition", "clean laboratory editorial", "dramatic close-up")
 ACTIONS = ("slow compression", "controlled fracture", "contained deformation", "pressure test", "before-and-after test")
+PHOTO_SCENES = (
+    ("a relaxed café visit", "enjoying a relaxed café visit, natural smile, tasteful everyday Indian clothing, warm daylight, authentic modern Indian café setting"),
+    ("a colorful local market", "exploring a colorful Indian local market, tasteful contemporary Indian clothing, cheerful relaxed expression, vibrant natural colors"),
+    ("a peaceful outdoor stroll", "enjoying a peaceful stroll in a leafy Indian city garden, tasteful casual Indian clothing, natural pose, soft golden-hour light"),
+)
 
 
 def load_state() -> dict:
@@ -133,7 +138,7 @@ def engagement_theme(page_id: str, token: str) -> str:
     ).get("data", [])
     candidates = [post for post in data if isinstance(post, dict) and post.get("message")] if isinstance(data, list) else []
     if not candidates:
-        return "a fresh, family-friendly material experiment"
+        return "a fresh, family-friendly lifestyle photo"
     for post in candidates:
         attachments = post.get("attachments", {})
         nodes = attachments.get("data", []) if isinstance(attachments, dict) else []
@@ -168,7 +173,7 @@ def generate_media(kind: str, prompt: str, model: str, api_key: str, reference: 
         params.update({"width": 1024, "height": 1280})
     else:
         params.update({"duration": VIDEO_SECONDS, "aspectRatio": "9:16", "audio": "false"})
-    if reference:
+    if reference and kind == "photo":
         params["image"] = reference
     response = requests.get(
         f"{POLLINATIONS_ROOT}/{endpoint}/{quote(prompt, safe='')}",
@@ -185,7 +190,7 @@ def generate_media(kind: str, prompt: str, model: str, api_key: str, reference: 
 def schedule_photo(page_id: str, token: str, image: bytes, caption: str, publish_at: datetime) -> str:
     upload = request_graph(
         "POST", f"{page_id}/photos", data={"access_token": token, "published": "false", "temporary": "true"},
-        files={"source": ("experiment.jpg", io.BytesIO(image), "image/jpeg")},
+        files={"source": ("lifestyle.jpg", io.BytesIO(image), "image/jpeg")},
     )
     photo_id = upload.get("id")
     if not isinstance(photo_id, str):
@@ -211,17 +216,25 @@ def schedule_video(page_id: str, token: str, video: bytes, caption: str, publish
     return video_id
 
 
-def caption_for(plan: dict[str, str], slot: str, winning_theme: str) -> str:
-    prompt = (
-        "Write one short, family-friendly Facebook caption in English for a simulated hydraulic-press material test. "
-        "No people, injuries, dangerous instructions, unsupported claims, engagement bait, or hashtags. "
-        f"Test: {plan['action']} on {plan['object']}; style: {plan['style']}; format: {slot}. "
-        f"Use this successful Page idea only as broad inspiration, never copy it: {winning_theme!r}. Return only the caption."
-    )
+def caption_for(plan: dict[str, str], slot: str, theme: str, is_video: bool) -> str:
+    if is_video:
+        prompt = (
+            "Write one short, family-friendly Facebook caption in English for a simulated hydraulic-press material test. "
+            "No people, injuries, dangerous instructions, unsupported claims, engagement bait, or hashtags. "
+            f"Test: {plan['action']} on {plan['object']}; style: {plan['style']}; slot: {slot}. "
+        )
+        fallback = f"A guarded hydraulic press puts {plan['object']} through a controlled {plan['action']}. Simulated material test."
+    else:
+        prompt = (
+            "Write one short, warm, family-friendly Facebook caption in English for a respectful everyday lifestyle photo "
+            "featuring a clearly adult Indian woman. Fully clothed, non-sexualized; no engagement bait or hashtags. "
+            f"Scene: {theme!r}; slot: {slot}. "
+        )
+        fallback = f"A little moment from {theme}. Wishing everyone a lovely day."
     try:
-        return generate_text(prompt)[:500]
+        return generate_text(prompt + "Return only the caption.")[:500]
     except RuntimeError:
-        return f"A guarded hydraulic press puts {plan['object']} through a controlled {plan['action']}. Simulated material test."
+        return fallback
 
 
 def run(dry_run: bool = False) -> None:
@@ -243,53 +256,75 @@ def run(dry_run: bool = False) -> None:
 
     history = state["creative_history"]
     plan = build_plan([item for item in history if isinstance(item, dict)])
-        if dry_run:
-                    print(
-                                    f"Dry run: plan={plan}; slots={[name for name, _ in POST_SLOTS]}; "
-                                    f"models={IMAGE_MODEL},{VIDEO_MODEL}; no API requests made."
-                    )
-                    return
+    if dry_run:
+        print(f"Dry run: plan={plan}; slots={[name for name, _ in POST_SLOTS]}; models={IMAGE_MODEL},{VIDEO_MODEL}; no API requests made.")
+        return
+
     winning_theme = engagement_theme(page_id, token)
     brief = generate_text(
         "Write a concise visual brief for a photorealistic, family-friendly hydraulic press experiment. "
         f"Test {plan['action']} on {plan['object']}; use {plan['style']}. Use a closed safety enclosure, "
-        "show only contained materials, no people or injuries. Best recent Page idea for inspiration only: "
-        f"{winning_theme!r}. Do not copy its wording. Return only the brief."
+        "show only contained materials, no people or injuries. Return only the brief."
     )[:500]
     references = upload_references(api_key)
     photo_prompts = {
-        "photo_morning": f"Before-impact view: {brief}. Portrait 4:5 composition, safety cage closed, no people, no text.",
-        "photo_evening": f"Distinct after-test view: {brief}. Different camera angle, controlled material deformation inside the safety cage, no people, no text.",
+        name: (
+            f"Photorealistic, family-friendly lifestyle editorial portrait of a fictional adult Indian woman age 25 or older, "
+            f"{scene}, natural confident pose, fully clothed in tasteful contemporary Indian clothing, realistic skin texture, "
+            "respectful and non-sexualized, no minors, no suggestive posing, no text, no watermark, no logo. Portrait 4:5 framing. "
+            "If a reference image is provided, use only its broad visual style and composition; do not copy the person's identity or face."
+        )
+        for (name, _), (_, scene) in zip((POST_SLOTS[0], POST_SLOTS[1], POST_SLOTS[2]), PHOTO_SCENES)
     }
-    media = {}
-    for name in missing:
+    media: dict[str, tuple[str, bytes]] = {}
+    for index, name in enumerate(("photo_morning", "experiment_video", "photo_evening")):
         reference = random.choice(references) if references else None
-        if name == "experiment_video":
-            media[name] = generate_media("video", f"Vertical cinematic video: {brief}. Show a guarded hydraulic press, slow controlled compression, result, no people, no injury, no text.", VIDEO_MODEL, api_key, reference)
-        else:
-            media[name] = generate_media("photo", photo_prompts[name], IMAGE_MODEL, api_key, reference)
+        if name != "experiment_video":
+            media[name] = ("photo", generate_media("photo", photo_prompts[name], IMAGE_MODEL, api_key, reference))
+            continue
+        fallback_photo = generate_media("photo", photo_prompts[name], IMAGE_MODEL, api_key, reference)
+        try:
+            video_prompt = (
+                f"Vertical cinematic video: a guarded hydraulic press performs a slow, controlled {plan['action']} "
+                f"on {plan['object']} inside a closed safety enclosure. Show the machine and contained material result. "
+                "No people, injuries, dangerous activity outside the enclosure, logos, or text."
+            )
+            media[name] = ("video", generate_media("video", video_prompt, VIDEO_MODEL, api_key))
+        except (requests.RequestException, RuntimeError) as error:
+            status = getattr(getattr(error, "response", None), "status_code", None)
+            suffix = f" (HTTP {status})" if status else ""
+            print(f"Hydraulic video unavailable ({error.__class__.__name__}{suffix}); using the midday photo.")
+            media[name] = ("photo", fallback_photo)
 
-    now = datetime.now(TIMEZONE)
     for name, slot_time in POST_SLOTS:
         if name not in missing:
             continue
         publish_at = datetime.combine(today, slot_time, TIMEZONE)
-        if publish_at <= now + timedelta(minutes=15):
+        if publish_at <= datetime.now(TIMEZONE) + timedelta(minutes=15):
             publish_at += timedelta(days=1)
-        caption = caption_for(plan, name, winning_theme)
-        post_id = schedule_video(page_id, token, media[name], caption, publish_at) if name == "experiment_video" else schedule_photo(page_id, token, media[name], caption, publish_at)
+        media_kind, content = media[name]
+        if media_kind == "video":
+            caption_theme = f"{plan['action']} on {plan['object']}"
+        else:
+            scene_index = {"photo_morning": 0, "experiment_video": 1, "photo_evening": 2}[name]
+            caption_theme = PHOTO_SCENES[scene_index][0]
+        caption = caption_for(plan, name, caption_theme, media_kind == "video")
+        if media_kind == "video":
+            post_id = schedule_video(page_id, token, content, caption, publish_at)
+        else:
+            post_id = schedule_photo(page_id, token, content, caption, publish_at)
         results[name] = {"post_id": post_id, "publish_at": publish_at.isoformat()}
         scheduled[day_key] = results
         if not any(item.get("date") == plan["date"] for item in history if isinstance(item, dict)):
             history.append(plan)
             state["creative_history"] = history[-90:]
         save_state(state)
-        print(f"Scheduled {name} for {publish_at.isoformat()}.")
+        print(f"Scheduled {name} as {media_kind} for {publish_at.isoformat()}.")
 
 
 if __name__ == "__main__":
     try:
-run("--dry-run" in sys.argv[1:])
+        run("--dry-run" in sys.argv[1:])
     except (OSError, ValueError, RuntimeError, requests.RequestException) as error:
         status = getattr(getattr(error, "response", None), "status_code", None)
         suffix = f" (HTTP {status})" if status else ""
