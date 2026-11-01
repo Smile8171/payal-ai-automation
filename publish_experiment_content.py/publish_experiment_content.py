@@ -224,11 +224,11 @@ def caption_for(plan: dict[str, str], slot: str, winning_theme: str) -> str:
         return f"A guarded hydraulic press puts {plan['object']} through a controlled {plan['action']}. Simulated material test."
 
 
-def run() -> None:
+def run(dry_run: bool = False) -> None:
     page_id = os.getenv("FB_PAGE_ID", "").strip()
     token = os.getenv("FB_PAGE_ACCESS_TOKEN", "").strip()
     api_key = os.getenv("POLLINATIONS_API_KEY", "").strip()
-    if not page_id or not token or not api_key:
+    if not dry_run and (not page_id or not token or not api_key):
         raise RuntimeError("Configure FB_PAGE_ID, FB_PAGE_ACCESS_TOKEN, and POLLINATIONS_API_KEY.")
 
     state = load_state()
@@ -243,6 +243,12 @@ def run() -> None:
 
     history = state["creative_history"]
     plan = build_plan([item for item in history if isinstance(item, dict)])
+        if dry_run:
+                    print(
+                                    f"Dry run: plan={plan}; slots={[name for name, _ in POST_SLOTS]}; "
+                                    f"models={IMAGE_MODEL},{VIDEO_MODEL}; no API requests made."
+                    )
+                    return
     winning_theme = engagement_theme(page_id, token)
     brief = generate_text(
         "Write a concise visual brief for a photorealistic, family-friendly hydraulic press experiment. "
@@ -283,7 +289,7 @@ def run() -> None:
 
 if __name__ == "__main__":
     try:
-        run()
+run("--dry-run" in sys.argv[1:])
     except (OSError, ValueError, RuntimeError, requests.RequestException) as error:
         status = getattr(getattr(error, "response", None), "status_code", None)
         suffix = f" (HTTP {status})" if status else ""
