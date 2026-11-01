@@ -100,6 +100,7 @@ jobs:
           python - <<'PY'
           import os
           import runpy
+          import requests
           from datetime import datetime, timedelta, timezone
 
           publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
@@ -107,11 +108,22 @@ jobs:
           page_token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
           scene_name, _ = publisher["PHOTO_SCENES"][0]
           expected = f"A little moment from {scene_name}. Wishing everyone a lovely day."
-          response = publisher["request_graph"](
-              "GET",
-              f"{page_id}/published_posts",
-              params={"access_token": page_token, "fields": "id,message,created_time,permalink_url,is_published,attachments{media_type,media,target}", "limit": 25},
-          )
+          fields = "id,message,created_time,permalink_url,is_published,attachments{media_type}"
+          response = None
+          for edge in (f"{page_id}/published_posts", f"{page_id}/feed"):
+              try:
+                  response = publisher["request_graph"](
+                      "GET", edge, params={"access_token": page_token, "fields": fields, "limit": 25}
+                  )
+                  break
+              except requests.HTTPError as error:
+                  try:
+                      details = error.response.json().get("error", {})
+                  except (AttributeError, ValueError):
+                      details = {}
+                  print(f"Meta read failed for {edge}: code={details.get('code')}, message={details.get('message', 'unavailable')}")
+          if response is None:
+              raise RuntimeError("Meta rejected both Page published_posts and feed inspection requests.")
           cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
           candidates = []
           for post in response.get("data", []):
@@ -124,19 +136,20 @@ jobs:
               if created < cutoff:
                   continue
               attachment_data = post.get("attachments", {}).get("data", [])
-              media_types = [item.get("media_type") or item.get("type") for item in attachment_data if isinstance(item, dict)]
+              media_types = [item.get("media_type") for item in attachment_data if isinstance(item, dict)]
               candidates.append((post, created, media_types))
           if not candidates:
-              raise RuntimeError("No matching recent post found in the Page published_posts edge.")
+              raise RuntimeError("No matching recent post found in the Page post list.")
+          verified = False
           for post, created, media_types in candidates:
               permalink = post.get("permalink_url")
               published = post.get("is_published")
-              print(f"Recent public-post candidate: created={created.isoformat()}, is_published={published}, media_types={media_types}, permalink={permalink or 'unavailable'}")
-              if published is True and isinstance(permalink, str) and any(kind in {"photo", "album"} for kind in media_types):
-                  print("Verified: a published Page post with a photo attachment and permalink exists.")
-                  break
-          else:
+              print(f"Post check: created={created.isoformat()}, is_published={published}, media_types={media_types}, permalink={permalink or 'unavailable'}")
+              if published is True and isinstance(permalink, str) and "photo" in media_types:
+                  verified = True
+          if not verified:
               raise RuntimeError("Recent matching post was not confirmed as published with a photo attachment and permalink.")
+          print("Verified a recent published Page post with a photo attachment and permalink.")
           PY
 
       - name: Generate and schedule three posts (midday video optional)
