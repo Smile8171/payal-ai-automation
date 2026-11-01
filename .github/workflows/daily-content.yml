@@ -64,10 +64,10 @@ jobs:
           page_token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
           scene_name, scene_description = publisher["PHOTO_SCENES"][0]
           prompt = (
-              "Photorealistic, family-friendly lifestyle editorial portrait of a fictional adult Indian woman age 25 or older, "
-              f"{scene_description}, natural confident pose, fully clothed in tasteful contemporary Indian clothing, realistic skin texture, "
-              "respectful and non-sexualized, no minors, no suggestive posing, no text, no watermark, no logo. Portrait 4:5 framing. "
-              "If a reference image is provided, use only its broad visual style and composition; do not copy the person's identity or face."
+              "Photorealistic documentary-style family-friendly portrait of a fictional clearly adult 20-year-old Indian woman from a rural village, "
+              f"{scene_description}, natural youthful adult features, calm natural expression, fully clothed in simple tasteful Indian clothing, realistic skin texture, "
+              "Authentic rural Indian setting, natural light and colors; avoid elderly or middle-aged appearance, studio glamour, city scenery, or illustration. Respectful and non-sexualized; no minors, suggestive posing, text, watermark, or logo. Portrait 4:5 framing. "
+              "Use references only for broad visual style/composition; do not copy a person's identity or face."
           )
           references = publisher["upload_references"](api_key)
           reference = random.choice(references) if references else None
