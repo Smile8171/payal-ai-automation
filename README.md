@@ -21,6 +21,8 @@ Configure `.env` before running the publishing script. It schedules real Page po
 
 The scheduled workflow runs daily at 05:45 India time and prepares the three posts for the daily schedule. Scheduled jobs may be delayed. Manual workflow dispatch defaults to a plan-only dry run; disable that input only when you intend to generate and schedule real Page content.
 
+For a single-photo test, leave `dry_run_only` checked and check `test_photo_only`. This generates one café-scene photo and schedules it to publish about 30 minutes later; it skips the regular three-post job. This is a real public Page post, not a private preview. For the regular three-post test, leave `test_photo_only` unchecked and uncheck `dry_run_only`.
+
 Add these repository secrets under **Settings > Secrets and variables > Actions**:
 
 - `FB_PAGE_ID`
