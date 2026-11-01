@@ -31,9 +31,9 @@ OBJECTS = ("a smartphone", "a steel ball", "a glass sphere", "a synthetic diamon
 STYLES = ("macro material study", "bright industrial documentary", "high-speed-camera look", "symmetrical product-test composition", "clean laboratory editorial", "dramatic close-up")
 ACTIONS = ("slow compression", "controlled fracture", "contained deformation", "pressure test", "before-and-after test")
 PHOTO_SCENES = (
-    ("a relaxed café visit", "enjoying a relaxed café visit, natural smile, tasteful everyday Indian clothing, warm daylight, authentic modern Indian café setting"),
-    ("a colorful local market", "exploring a colorful Indian local market, tasteful contemporary Indian clothing, cheerful relaxed expression, vibrant natural colors"),
-    ("a peaceful outdoor stroll", "enjoying a peaceful stroll in a leafy Indian city garden, tasteful casual Indian clothing, natural pose, soft golden-hour light"),
+    ("a village courtyard at sunrise", "in a quiet rural Indian village courtyard at sunrise, simple tasteful everyday salwar kameez, mud-plastered home, plants, and soft morning light"),
+    ("a path beside village fields", "walking along a rural village path beside green fields, simple tasteful cotton salwar kameez, authentic Indian countryside, and natural daylight"),
+    ("a village home in late-afternoon light", "outside a modest rural Indian village home in late-afternoon light, simple tasteful everyday Indian clothing, trees, and village homes in the background"),
 )
 
 
@@ -196,7 +196,7 @@ def schedule_photo(page_id: str, token: str, image: bytes, caption: str, publish
     if not isinstance(photo_id, str):
         raise RuntimeError("Meta did not return a photo ID.")
     post = request_graph(
-        "POST", f"{page_id}/feed", data={"access_token": token, "message": caption, "attached_media[0][media_fbid]": photo_id, "published": "false", "scheduled_publish_time": str(int(publish_at.timestamp()))},
+        "POST", f"{page_id}/feed", data={"access_token": token, "message": caption, "attached_media[0]": json.dumps({"media_fbid": photo_id}), "published": "false", "scheduled_publish_time": str(int(publish_at.timestamp()))},
     )
     post_id = post.get("id")
     if not isinstance(post_id, str):
@@ -269,9 +269,9 @@ def run(dry_run: bool = False) -> None:
     references = upload_references(api_key)
     photo_prompts = {
         name: (
-            f"Photorealistic, family-friendly lifestyle editorial portrait of a fictional adult Indian woman age 25 or older, "
-            f"{scene}, natural confident pose, fully clothed in tasteful contemporary Indian clothing, realistic skin texture, "
-            "respectful and non-sexualized, no minors, no suggestive posing, no text, no watermark, no logo. Portrait 4:5 framing. "
+            f"Photorealistic documentary-style family-friendly portrait of a fictional clearly adult 20-year-old Indian woman from a rural village, "
+            f"{scene}, natural youthful adult features, calm natural expression, fully clothed in simple tasteful Indian clothing, realistic skin texture, "
+            "Authentic rural Indian setting, natural light and colors; avoid elderly or middle-aged appearance, studio glamour, city scenery, or illustration. Respectful and non-sexualized; no minors, suggestive posing, text, watermark, or logo. Portrait 4:5 framing. "
             "If a reference image is provided, use only its broad visual style and composition; do not copy the person's identity or face."
         )
         for (name, _), (_, scene) in zip((POST_SLOTS[0], POST_SLOTS[1], POST_SLOTS[2]), PHOTO_SCENES)
