@@ -9,6 +9,117 @@ on:
         type: boolean
         default: true
       test_photo_only:
+        description: "Generate and publish one test photo immediately"
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    - cron: "15 0 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: payal-ai-automation-state
+  cancel-in-progress: false
+
+jobs:
+  schedule-content:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Validate experiment plan without API calls
+        run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
+
+      - name: Generate and schedule one test photo
+        if: github.event_name == 'workflow_dispatch' && inputs.test_photo_only == true
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          FB_GRAPH_API_VERSION: v26.0
+          TIMEZONE: Asia/Kolkata
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          POLLINATIONS_IMAGE_MODEL: ${{ vars.POLLINATIONS_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b' }}
+        run: |
+          python - <<'PY'
+          import io
+          import os
+          import random
+          import runpy
+
+          publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
+          api_key = os.environ["POLLINATIONS_API_KEY"].strip()
+          page_id = os.environ["FB_PAGE_ID"].strip()
+          page_token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
+          scene_name, scene_description = publisher["PHOTO_SCENES"][0]
+          prompt = (
+              "Photorealistic documentary-style family-friendly portrait of a fictional clearly adult 20-year-old Indian woman from a rural village, "
+              f"{scene_description}, natural youthful adult features, calm natural expression, fully clothed in simple tasteful Indian clothing, realistic skin texture, "
+              "Authentic rural Indian setting, natural light and colors; avoid elderly or middle-aged appearance, studio glamour, city scenery, or illustration. Respectful and non-sexualized; no minors, suggestive posing, text, watermark, or logo. Portrait 4:5 framing. "
+              "Use references only for broad visual style/composition; do not copy a person's identity or face."
+          )
+          references = publisher["upload_references"](api_key)
+          reference = random.choice(references) if references else None
+          image = publisher["generate_media"]("photo", prompt, publisher["IMAGE_MODEL"], api_key, reference)
+          caption = f"A little moment from {scene_name}. Wishing everyone a lovely day."
+          result = publisher["request_graph"](
+              "POST",
+              f"{page_id}/photos",
+              data={"access_token": page_token, "message": caption, "published": "true"},
+              files={"source": ("test-photo.jpg", io.BytesIO(image), "image/jpeg")},
+          )
+          post_id = result.get("post_id") or result.get("id")
+          if not isinstance(post_id, str):
+              raise RuntimeError("Meta did not return a published test photo ID.")
+          print(f"Published one test photo as {post_id}.")
+          PY
+
+      - name: Generate and schedule three posts (midday video optional)
+        if: github.event_name == 'schedule' || (inputs.test_photo_only != true && inputs.dry_run_only != true)
+        env:
+          FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+          FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+          FB_GRAPH_API_VERSION: v26.0
+          TIMEZONE: Asia/Kolkata
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_API_KEY_2: ${{ secrets.GEMINI_API_KEY_2 }}
+          GEMINI_API_KEY_3: ${{ secrets.GEMINI_API_KEY_3 }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          POLLINATIONS_IMAGE_MODEL: ${{ vars.POLLINATIONS_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b' }}
+          POLLINATIONS_VIDEO_MODEL: ${{ vars.POLLINATIONS_VIDEO_MODEL || 'google/veo-3.1-fast' }}
+          VIDEO_DURATION_SECONDS: "4"
+        run: python publish_experiment_content.py/publish_experiment_content.py
+
+      - name: Persist duplicate-prevention state
+        if: always()
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Persist daily publishing state"
+          file_pattern: data/publishing_state.json
+name: Daily Facebook content
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run_only:
+        description: "Only validate the content plan; do not generate or publish media"
+        required: false
+        type: boolean
+        default: true
+      test_photo_only:
         description: "Generate and schedule one test photo about 3 minutes from now"
         required: false
         type: boolean
