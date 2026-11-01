@@ -9,7 +9,7 @@ on:
         type: boolean
         default: true
       test_photo_only:
-        description: "Generate and schedule one test photo about 30 minutes from now"
+        description: "Generate and schedule one test photo about 3 minutes from now"
         required: false
         type: boolean
         default: false
@@ -73,7 +73,7 @@ jobs:
           reference = random.choice(references) if references else None
           image = publisher["generate_media"]("photo", prompt, publisher["IMAGE_MODEL"], api_key, reference)
           caption = f"A little moment from {scene_name}. Wishing everyone a lovely day."
-          publish_at = datetime.now(publisher["TIMEZONE"]) + timedelta(minutes=30)
+          publish_at = datetime.now(publisher["TIMEZONE"]) + timedelta(minutes=3)
           post_id = publisher["schedule_photo"](
               page_id,
               page_token,
