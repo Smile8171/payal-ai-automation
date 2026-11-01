@@ -113,7 +113,10 @@ jobs:
           if photo is None:
               photo = read("photo_minimal", photo_id, "id,created_time")
           if photo is not None:
-              print(f"PHOTO_METADATA id={photo.get('id')}, created_time={photo.get('created_time')}, name={photo.get('name')}, from={photo.get('from')}, link={photo.get('link')}")
+              print(f"PHOTO_METADATA id={photo.get('id')}, created_time={photo.get('created_time')}, name={photo.get('name')}, link={photo.get('link')}")
+              owner = photo.get("from")
+              owner_id = owner.get("id") if isinstance(owner, dict) else None
+              print(f"PHOTO_OWNER_MATCH_CONFIGURED_PAGE={owner_id == page_id}; PHOTO_OWNER_MATCH_PUBLIC_PAGE={owner_id == '100064452445545'}")
 
           feed = read("page_feed", f"{page_id}/feed", "id,message,created_time")
           candidates = [
@@ -127,11 +130,11 @@ jobs:
               print(f"PAGE_FEED_MATCH id={post_id}, created_time={item.get('created_time')}")
               if not isinstance(post_id, str):
                   continue
-              detail = read("post_detail", post_id, "id,message,created_time,permalink_url,attachments")
+              detail = read("post_detail", post_id, "id,message,created_time,permalink_url,is_published,privacy,status_type,attachments")
               if detail is None:
                   detail = read("post_detail_minimal", post_id, "id,message,created_time")
               if detail is not None:
-                  print(f"POST_METADATA id={detail.get('id')}, created_time={detail.get('created_time')}, permalink={detail.get('permalink_url')}, attachments={detail.get('attachments')}")
+                  print(f"POST_METADATA id={detail.get('id')}, created_time={detail.get('created_time')}, is_published={detail.get('is_published')}, privacy={detail.get('privacy')}, status_type={detail.get('status_type')}, permalink={detail.get('permalink_url')}, attachments={detail.get('attachments')}")
           PY
 
       - name: Generate and schedule three posts (midday video optional)
