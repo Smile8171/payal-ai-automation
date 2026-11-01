@@ -1,10 +1,10 @@
-# Payal AI Automation
+# Payal M
 
-Schedules two AI-generated images daily for an authorized Facebook Page. Video generation and posting are paused until a genuinely free video provider is available. A separate job checks recent Page comments every 30 minutes and replies once per comment. The daily job uses recent post engagement to guide creative themes and records scheduled slots to avoid duplicate runs.
+Automates content for a Facebook Page you administer: two AI-generated hydraulic-press experiment photos and one short vertical video each day. Reference images can guide style. Recent Page engagement is used to inspire new experiments, and scheduled post IDs plus experiment history reduce duplicate posts. A separate workflow checks Page post comments every 30 minutes and replies once per comment.
 
 ## Setup
 
-Install Python 3.12 and FFmpeg, then install the dependencies:
+Install Python 3.12 and dependencies:
 
 ```powershell
 python -m venv .venv
@@ -13,18 +13,13 @@ python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-Set the environment variables from `.env.example` locally, then run either job:
+Configure `.env` before running scripts. These commands can schedule real posts and send real replies; there is no local dry-run mode.
 
-```powershell
-python publish_daily_content.py
-python reply_to_comments.py
-```
+Posts are scheduled for 07:00, 13:00, and 19:00 in `Asia/Kolkata`. GitHub Actions starts the daily job at 05:45 India time; manual dispatch follows the same schedule. Scheduled workflow times can be delayed by GitHub.
 
-The posting job schedules images for 07:00 and 19:00 in `Asia/Kolkata`. GitHub Actions runs it daily at 05:45 India time and checks comments every 30 minutes. Dispatching the daily workflow manually also schedules posts; it does not publish them immediately.
+## GitHub Secrets
 
-## GitHub Actions Secrets
-
-Add these under **Settings > Secrets and variables > Actions**:
+Add under **Settings > Secrets and variables > Actions**:
 
 - `FB_PAGE_ID`
 - `FB_PAGE_ACCESS_TOKEN`
@@ -32,10 +27,12 @@ Add these under **Settings > Secrets and variables > Actions**:
 - At least one text provider key: `GEMINI_API_KEY`, `OPENROUTER_API_KEY`, or `OPENAI_API_KEY`
 - Optional Gemini fallbacks: `GEMINI_API_KEY_2` and `GEMINI_API_KEY_3`
 
-Enable Actions and allow workflows to write repository contents so the jobs can persist duplicate-prevention state. The Page token needs Meta permissions for Page publishing, engagement reads, and comment replies. Meta app review may be required.
+Optional repository variables: `POLLINATIONS_IMAGE_MODEL` and `POLLINATIONS_VIDEO_MODEL`. Video generation consumes Pollen; the default video model may require a paid balance. Check current model prices, access, and supported clip duration before enabling scheduled runs.
 
-Comment text is sent to the configured text provider to draft a reply. The fallback reply is used if all text providers fail.
+GitHub Actions needs permission to write repository contents to persist duplicate-prevention state. The Page token needs Page publishing, post/comment reads and replies, and `read_insights` for video views. Meta app review or business verification may be required. Ranking falls back to likes, comments, and shares if video insights are unavailable.
 
-## Safety
+## Limits And Safety
 
-Use only a Page you administer and content you are authorized to publish. Test with a non-production Page before enabling real credentials. Never commit `.env`, API keys, Page tokens, app secrets, or private media.
+This automation targets Facebook Pages only. Facebook Group publishing/comment replies are not enabled because Meta restricts Group API access; personal-account automation and browser scraping are not used.
+
+This repository is public. Do not commit credentials, private reference photos, or other sensitive material. Only commit images you are authorized to publish publicly. Use a Page you administer. Generated media is not guaranteed to follow safety prompts, so review output before enabling scheduled publication. Comment text is sent to the configured text model to draft a reply.
