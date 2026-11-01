@@ -9,7 +9,7 @@ on:
         type: boolean
         default: true
       test_photo_only:
-        description: "Generate and publish one test photo immediately"
+        description: "Attach the existing public test photo to one Page feed post"
         required: false
         type: boolean
         default: false
@@ -47,47 +47,35 @@ jobs:
       - name: Validate experiment plan without API calls
         run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
 
-      - name: Generate and schedule one test photo
+      - name: Attach the existing public photo to one Page feed post
         if: github.event_name == 'workflow_dispatch' && inputs.test_photo_only == true
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
           FB_GRAPH_API_VERSION: v26.0
-          TIMEZONE: Asia/Kolkata
-          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
-          POLLINATIONS_IMAGE_MODEL: ${{ vars.POLLINATIONS_IMAGE_MODEL || 'black-forest-labs/flux.2-klein-4b' }}
         run: |
           python - <<'PY'
-          import io
+          import json
           import os
-          import random
           import runpy
 
           publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
-          api_key = os.environ["POLLINATIONS_API_KEY"].strip()
           page_id = os.environ["FB_PAGE_ID"].strip()
           page_token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
-          scene_name, scene_description = publisher["PHOTO_SCENES"][0]
-          prompt = (
-              "Photorealistic documentary-style family-friendly portrait of a fictional clearly adult 20-year-old Indian woman from a rural village, "
-              f"{scene_description}, natural youthful adult features, calm natural expression, fully clothed in simple tasteful Indian clothing, realistic skin texture, "
-              "Authentic rural Indian setting, natural light and colors; avoid elderly or middle-aged appearance, studio glamour, city scenery, or illustration. Respectful and non-sexualized; no minors, suggestive posing, text, watermark, or logo. Portrait 4:5 framing. "
-              "Use references only for broad visual style/composition; do not copy a person's identity or face."
-          )
-          references = publisher["upload_references"](api_key)
-          reference = random.choice(references) if references else None
-          image = publisher["generate_media"]("photo", prompt, publisher["IMAGE_MODEL"], api_key, reference)
-          caption = f"A little moment from {scene_name}. Wishing everyone a lovely day."
           result = publisher["request_graph"](
               "POST",
-              f"{page_id}/photos",
-              data={"access_token": page_token, "message": caption, "published": "true"},
-              files={"source": ("test-photo.jpg", io.BytesIO(image), "image/jpeg")},
+              f"{page_id}/feed",
+              data={
+                  "access_token": page_token,
+                  "message": "A little moment from a village courtyard at sunrise. Wishing everyone a lovely day.",
+                  "attached_media[0]": json.dumps({"media_fbid": "1544799337678466"}),
+                  "published": "true",
+              },
           )
-          post_id = result.get("post_id") or result.get("id")
+          post_id = result.get("id")
           if not isinstance(post_id, str):
-              raise RuntimeError("Meta did not return a published test photo ID.")
-          print(f"Published one test photo as {post_id}.")
+              raise RuntimeError("Meta did not return a Page feed post ID.")
+          print(f"Published one Page feed test using existing photo: {post_id}.")
           PY
 
       - name: Inspect the recent published test photo
