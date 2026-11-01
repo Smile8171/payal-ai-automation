@@ -2,6 +2,12 @@ name: Daily Facebook content
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run_only:
+        description: "Only validate the content plan; do not generate or publish media"
+        required: false
+        type: boolean
+        default: true
   schedule:
     - cron: "15 0 * * *"
 
@@ -32,6 +38,7 @@ jobs:
         run: python publish_experiment_content.py/publish_experiment_content.py --dry-run
 
       - name: Generate and schedule two photos and one video
+        if: github.event_name == 'schedule' || inputs.dry_run_only != true
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
