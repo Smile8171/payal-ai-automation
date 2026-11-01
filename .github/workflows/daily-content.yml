@@ -9,7 +9,7 @@ on:
         type: boolean
         default: true
       test_photo_only:
-        description: "Generate one fresh unpublished photo, then attach it to one Page feed post"
+        description: "Generate one fresh photo and schedule one Page feed post 20 minutes ahead"
         required: false
         type: boolean
         default: false
