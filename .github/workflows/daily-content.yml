@@ -14,7 +14,7 @@ on:
         type: boolean
         default: false
       verify_feed_only:
-        description: "Verify the recent test photo appears in the Page feed without publishing"
+        description: "Inspect recent published photo permalink and attachment without publishing"
         required: false
         type: boolean
         default: false
@@ -90,7 +90,7 @@ jobs:
           print(f"Published one test photo as {post_id}.")
           PY
 
-      - name: Verify the recent test photo in the Page feed
+      - name: Inspect the recent published test photo
         if: github.event_name == 'workflow_dispatch' && inputs.verify_feed_only == true
         env:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
@@ -109,11 +109,11 @@ jobs:
           expected = f"A little moment from {scene_name}. Wishing everyone a lovely day."
           response = publisher["request_graph"](
               "GET",
-              f"{page_id}/feed",
-              params={"access_token": page_token, "fields": "id,message,created_time", "limit": 25},
+              f"{page_id}/published_posts",
+              params={"access_token": page_token, "fields": "id,message,created_time,permalink_url,is_published,attachments{media_type,media,target}", "limit": 25},
           )
-          cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
-          matches = []
+          cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+          candidates = []
           for post in response.get("data", []):
               if not isinstance(post, dict) or post.get("message") != expected:
                   continue
@@ -121,11 +121,22 @@ jobs:
                   created = datetime.fromisoformat(post["created_time"].replace("Z", "+00:00"))
               except (KeyError, TypeError, ValueError):
                   continue
-              if created >= cutoff:
-                  matches.append(post)
-          if not matches:
-              raise RuntimeError("The immediate test photo was not found in the Page feed within the last 15 minutes.")
-          print("Verified the recent test photo is present in the Page feed.")
+              if created < cutoff:
+                  continue
+              attachment_data = post.get("attachments", {}).get("data", [])
+              media_types = [item.get("media_type") or item.get("type") for item in attachment_data if isinstance(item, dict)]
+              candidates.append((post, created, media_types))
+          if not candidates:
+              raise RuntimeError("No matching recent post found in the Page published_posts edge.")
+          for post, created, media_types in candidates:
+              permalink = post.get("permalink_url")
+              published = post.get("is_published")
+              print(f"Recent public-post candidate: created={created.isoformat()}, is_published={published}, media_types={media_types}, permalink={permalink or 'unavailable'}")
+              if published is True and isinstance(permalink, str) and any(kind in {"photo", "album"} for kind in media_types):
+                  print("Verified: a published Page post with a photo attachment and permalink exists.")
+                  break
+          else:
+              raise RuntimeError("Recent matching post was not confirmed as published with a photo attachment and permalink.")
           PY
 
       - name: Generate and schedule three posts (midday video optional)
