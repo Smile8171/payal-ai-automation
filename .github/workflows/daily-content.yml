@@ -117,6 +117,10 @@ jobs:
                   print(f"READ_ONLY_ERROR {label}: code={details.get('code')}, subcode={details.get('error_subcode')}, message={details.get('message', 'unavailable')}")
                   return None
 
+          page = read("configured_page", page_id, "id,name,link,username")
+          if page is not None:
+              print("CONFIGURED_PAGE", "id=", page.get("id"), "name=", page.get("name"), "link=", page.get("link"), "username=", page.get("username"))
+
           photo = read("photo_metadata", photo_id, "id,created_time,name,from,link")
           if photo is None:
               photo = read("photo_minimal", photo_id, "id,created_time")
@@ -146,7 +150,7 @@ jobs:
                   owner = (visibility or {}).get("from")
                   owner_id = owner.get("id") if isinstance(owner, dict) else None
                   owner_name = owner.get("name") if isinstance(owner, dict) else None
-                  print("POST_METADATA", "id=", detail.get("id"), "created_time=", detail.get("created_time"), "is_published=", detail.get("is_published"), "is_hidden=", (visibility or {}).get("is_hidden"), "privacy=", detail.get("privacy"), "status_type=", detail.get("status_type"), "owner_matches_configured=", owner_id == page_id, "owner_name=", owner_name, "permalink=", detail.get("permalink_url"))
+                  print("POST_METADATA", "id=", detail.get("id"), "created_time=", detail.get("created_time"), "is_published=", detail.get("is_published"), "is_hidden=", (visibility or {}).get("is_hidden"), "privacy=", detail.get("privacy"), "status_type=", detail.get("status_type"), "owner_matches_configured=", owner_id == page_id, "owner_id=", owner_id, "owner_name=", owner_name, "permalink=", detail.get("permalink_url"))
           PY
 
       - name: Generate and schedule three posts (midday video optional)
