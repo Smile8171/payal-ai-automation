@@ -5,14 +5,19 @@ GRAPH_API = "https://graph.facebook.com/v19.0"
 
 
 def post_photo(image_path: str, caption: str):
-    page_id = os.getenv("FACEBOOK_PAGE_ID", "")
-    token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "")
+    page_id = os.getenv("FB_PAGE_ID", "")
+    token = os.getenv("FB_PAGE_ACCESS_TOKEN", "")
     url = f"{GRAPH_API}/{page_id}/photos"
 
     with open(image_path, "rb") as file:
         response = requests.post(
             url,
-            data={"access_token": token, "published": "true", "message": caption},
+            data={
+                "access_token": token,
+                "published": "true",
+                "no_story": "false",
+                "message": caption,
+            },
             files={"source": file},
             timeout=120,
         )
@@ -21,8 +26,8 @@ def post_photo(image_path: str, caption: str):
 
 
 def post_video(video_path: str, caption: str):
-    page_id = os.getenv("FACEBOOK_PAGE_ID", "")
-    token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "")
+    page_id = os.getenv("FB_PAGE_ID", "")
+    token = os.getenv("FB_PAGE_ACCESS_TOKEN", "")
     url = f"{GRAPH_API}/{page_id}/videos"
 
     with open(video_path, "rb") as file:
@@ -37,7 +42,7 @@ def post_video(video_path: str, caption: str):
 
 
 def get_comments(post_id: str):
-    token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "")
+    token = os.getenv("FB_PAGE_ACCESS_TOKEN", "")
     url = f"{GRAPH_API}/{post_id}/comments"
     response = requests.get(
         url,
@@ -49,7 +54,7 @@ def get_comments(post_id: str):
 
 
 def reply_to_comment(comment_id: str, message: str):
-    token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN", "")
+    token = os.getenv("FB_PAGE_ACCESS_TOKEN", "")
     url = f"{GRAPH_API}/{comment_id}/replies"
     response = requests.post(
         url,
