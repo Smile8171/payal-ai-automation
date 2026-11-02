@@ -101,7 +101,7 @@ jobs:
           publisher = runpy.run_path("publish_experiment_content.py/publish_experiment_content.py")
           page_id = os.environ["FB_PAGE_ID"].strip()
           token = os.environ["FB_PAGE_ACCESS_TOKEN"].strip()
-          photo_id = "1544824481009285"
+          photo_id = "1544861641005569"
           expected = "A peaceful sunrise in a village courtyard. Wishing everyone a lovely day."
 
           def read(label, path, fields):
